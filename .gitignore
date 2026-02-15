@@ -1,0 +1,57 @@
+# Data and model artifacts
+data/
+pretrained/
+checkpoints/
+outputs/
+pseudo_labels/
+results/
+*.nii.gz
+*.nii
+*.pt
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing and tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Experiment tracking
+wandb/
+mlruns/
+lightning_logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Claude Code
+.claude/history/
+
+# OS
+.DS_Store
+Thumbs.db
