@@ -422,18 +422,18 @@ class TestTransformPipelines:
     """Tests for labeled, pseudo-label, val, and combined transform pipelines."""
 
     def test_labeled_train_has_brats_conversion(self, small_config: dict) -> None:
-        """Labeled train transforms include ConvertToMultiChannelBasedOnBratsClassesd."""
+        """Labeled train transforms include ConvertMSDBratsClassesd."""
 
         transforms = get_labeled_train_transforms(small_config)
         type_names = [type(t).__name__ for t in transforms.transforms]
-        assert "ConvertToMultiChannelBasedOnBratsClassesd" in type_names
+        assert "ConvertMSDBratsClassesd" in type_names
 
     def test_pseudo_label_skips_brats_conversion(self, small_config: dict) -> None:
         """Pseudo-label transforms must NOT include BraTS conversion."""
 
         transforms = get_pseudo_label_transforms(small_config)
         type_names = [type(t).__name__ for t in transforms.transforms]
-        assert "ConvertToMultiChannelBasedOnBratsClassesd" not in type_names
+        assert "ConvertMSDBratsClassesd" not in type_names
 
     def test_combined_uses_conditional_transform(self, small_config: dict) -> None:
         """Combined train transforms use ConditionalBratsTransform."""

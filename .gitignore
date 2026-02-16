@@ -1,10 +1,10 @@
 # Data and model artifacts
-data/
-pretrained/
-checkpoints/
-outputs/
-pseudo_labels/
-results/
+/data/
+/pretrained/
+/checkpoints/
+/outputs/
+/pseudo_labels/
+/results/
 *.nii.gz
 *.nii
 *.pt
