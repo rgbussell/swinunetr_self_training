@@ -37,6 +37,13 @@ pre-commit run --all-files                 # Pre-commit hooks
 python scripts/run_self_training.py --config configs/self_training_config.yaml  # Train
 ```
 
+## Training Workflow
+1. **Baseline first**: Must complete baseline fine-tuning in `vit_swinunetr_segmentation` (300 epochs) before running self-training
+2. **Always set**: `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to prevent CUDA OOM from memory fragmentation
+3. **Self-training roi_size**: Must be 96^3 (not 128^3) because student + teacher both in VRAM
+4. **Label convention**: MSD Task01 uses `{0,1,2,3}`, NOT BraTS18 `{0,1,2,4}`. Always use `ConvertMSDBratsClassesd` from `swinunetr_seg.data.transforms`, never MONAI's `ConvertToMultiChannelBasedOnBratsClassesd`
+5. See `docs/training-notes.md` for full details and known issues
+
 ## Conventions
 - `from __future__ import annotations` at top of every module
 - Type hints: `X | Y` union syntax (not `Union[X, Y]`)

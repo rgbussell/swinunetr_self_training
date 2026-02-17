@@ -253,28 +253,40 @@ class SelfTrainer:
                 labeled_mask = ~is_pseudo
                 pseudo_mask = is_pseudo
 
-                # Forward pass through student
+                # Forward passes and loss computation must share the same
+                # autocast context to avoid dtype mismatches (float16 vs float32)
+                # between student logits, teacher logits, and labels.
                 if self.use_amp:
                     with torch.amp.autocast("cuda"):
                         student_logits = self.student(images)
+
+                        with torch.no_grad():
+                            teacher_logits = self.teacher(images)
+
+                        loss_dict = self.loss_fn(
+                            student_logits,
+                            labels=labels if labeled_mask.any() else None,
+                            pseudo_labels=labels if pseudo_mask.any() else None,
+                            teacher_logits=teacher_logits,
+                        )
+
+                        ramp_weight = get_loss_ramp_weight(epoch, ramp_up_epochs)
+                        loss_dict = apply_ramp_weight(loss_dict, ramp_weight)
                 else:
                     student_logits = self.student(images)
 
-                # Forward pass through teacher (no gradients)
-                with torch.no_grad():
-                    teacher_logits = self.teacher(images)
+                    with torch.no_grad():
+                        teacher_logits = self.teacher(images)
 
-                # Compute combined loss
-                loss_dict = self.loss_fn(
-                    student_logits,
-                    labels=labels if labeled_mask.any() else None,
-                    pseudo_labels=labels if pseudo_mask.any() else None,
-                    teacher_logits=teacher_logits,
-                )
+                    loss_dict = self.loss_fn(
+                        student_logits,
+                        labels=labels if labeled_mask.any() else None,
+                        pseudo_labels=labels if pseudo_mask.any() else None,
+                        teacher_logits=teacher_logits,
+                    )
 
-                # Apply ramp-up weight
-                ramp_weight = get_loss_ramp_weight(epoch, ramp_up_epochs)
-                loss_dict = apply_ramp_weight(loss_dict, ramp_weight)
+                    ramp_weight = get_loss_ramp_weight(epoch, ramp_up_epochs)
+                    loss_dict = apply_ramp_weight(loss_dict, ramp_weight)
 
                 # Backward pass
                 self.optimizer.zero_grad()
