@@ -32,7 +32,7 @@ self_training:
   ramp_up_epochs: 20
 
   # Quality control
-  min_confidence_fraction: 0.3
+  min_confidence_fraction: 0.001
   max_pseudo_label_ratio: 0.5
 
 training:
@@ -46,9 +46,9 @@ training:
   early_stopping_patience: 30
 
 data:
-  roi_size: [128, 128, 128]
+  roi_size: [96, 96, 96]
   train_val_split: 0.8
-  cache_rate: 0.5
+  cache_rate: 0.1
   strong_augmentation:
     gaussian_noise_std: 0.1
     gamma_range: [0.7, 1.5]
@@ -57,9 +57,9 @@ data:
     gaussian_smooth_sigma: [0.5, 1.15]
 
 paths:
-  base_data_dir: ./data/Task01_BrainTumour
-  baseline_checkpoint: ./pretrained/baseline_best_model.pt
-  output_dir: ./outputs
-  checkpoint_dir: ./checkpoints
-  pseudo_label_dir: ./pseudo_labels
-  results_dir: ./results
+  base_data_dir: /home/rbussell/projects/vit_swinunetr_segmentation/data/Task01_BrainTumour
+  baseline_checkpoint: /home/rbussell/projects/vit_swinunetr_segmentation/checkpoints/best_model.pt
+  output_dir: /home/rbussell/projects/swinunetr_self_training/outputs
+  checkpoint_dir: /home/rbussell/projects/swinunetr_self_training/checkpoints
+  pseudo_label_dir: /home/rbussell/projects/swinunetr_self_training/pseudo_labels
+  results_dir: /home/rbussell/projects/swinunetr_self_training/results
