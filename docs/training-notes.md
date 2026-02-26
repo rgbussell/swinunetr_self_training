@@ -71,13 +71,13 @@ The `best_model.pt` checkpoint contains full training state (model weights, opti
 
 **Lesson**: When working with medical imaging datasets, always verify label conventions match between the dataset and the transform pipeline. Run a quick sanity check: load one sample, apply the transform, and verify every output channel has non-zero voxels.
 
-### 4. AMP dtype mismatch in Self-Training Backward Pass
+### 4. AMP dtype mismatch in Self-Training Backward Pass (Fixed)
 
-**Symptom**: `RuntimeError: Found dtype Float but expected Half` during backward pass.
+**Symptom**: `RuntimeError: Found dtype Float but expected Half` during backward pass on the very first training step.
 
-**Status**: Open. Occurs during self-training (not baseline). Likely related to the interaction between AMP autocast, the EMA teacher (which may not be in the same dtype context), and the three-component loss function.
+**Root cause**: The student forward pass ran inside `torch.amp.autocast("cuda")` (producing float16 logits), but the teacher forward pass and loss computation ran **outside** autocast (producing float32). The MSE consistency loss between float16 student and float32 teacher logits created a mixed-dtype computational graph that failed during backward.
 
-**Workaround**: Under investigation. May need explicit dtype management in the loss computation or teacher inference.
+**Fix**: Moved teacher forward pass and loss computation inside the same autocast context as the student forward pass. All forward + loss operations now share one autocast scope.
 
 ---
 
@@ -117,3 +117,35 @@ tensorboard --logdir outputs/tb_logs
 - **Mean Dice trending upward**: Normal training convergence
 - **HD95 decreasing**: Spatial accuracy improving
 - **Loss decreasing**: Optimization is working
+
+---
+
+## Run 2 Results (Feb 18, 2026)
+
+**Baseline**: Mean Dice 0.842, early stopped at epoch 169 (best at epoch 119)
+
+### Self-Training Results by Round
+
+| Round | Dice TC | Dice WT | Dice ET | Mean Dice | HD95 Mean | Pseudo-labels Accepted |
+|-------|---------|---------|---------|-----------|-----------|------------------------|
+| 0 (baseline@96³) | 0.819 | 0.880 | 0.799 | 0.833 | 12.39 | 0/266 |
+| 1 | 0.820 | 0.877 | 0.807 | **0.835** | 10.02 | 212/266 (80%) |
+| 2 | 0.819 | 0.877 | 0.800 | 0.832 | 11.33 | 219/266 (82%) |
+| 3 | 0.819 | 0.878 | 0.802 | 0.833 | **9.41** | 219/266 (82%) |
+
+### Analysis
+
+- **Best Dice Mean**: 0.835 (Round 1) — saved as `best_self_trained.pt`
+- **HD95 improved 24%**: 12.39 → 9.41 across rounds (boundary refinement)
+- **Dice improvement marginal**: +0.2% over baseline (0.833 → 0.835)
+- **Diminishing returns**: Round 1 was peak Dice. Rounds 2-3 accepted more pseudo-labels (lower confidence threshold via curriculum) but noisier labels didn't help Dice
+- **Early stopping pattern**: Round 1 stopped at epoch 39, Round 2 at 44, Round 3 at 79 — model converges quickly each round
+- **ET class improved most**: 0.799 → 0.807 (+1.0%)
+
+### Known Issue: min_confidence_fraction (Fixed)
+
+**Run 1** produced zero pseudo-labels across all 4 rounds because `min_confidence_fraction` was set to 0.3 (30%). Brain tumors occupy ~1-5% of brain volume, so the maximum possible confident voxel fraction is ~0.015. The median observed was 0.0037.
+
+**Fix**: Changed to 0.001 (0.1%). Run 2 accepted 80-82% of pseudo-labels.
+
+**Lesson**: Always validate quality control thresholds against the expected anatomy. A threshold that sounds reasonable in abstract (30% of voxels) can be physically impossible for small structures like tumors.

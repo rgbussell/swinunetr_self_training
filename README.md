@@ -44,9 +44,27 @@ Self-training with iterative pseudo-labeling for 3D brain tumor segmentation usi
 
 ## Key Results
 
-Self-training achieved **marginal Dice improvement but 24% sharper boundaries** (HD95), with the hardest class (Enhancing Tumor) benefiting most.
+### BrainSegFounder Baseline (Best Single-Model Result)
 
-| Metric | Baseline | Best Self-Trained | Improvement |
+Replacing MONAI pretrained encoder weights with [BrainSegFounder](https://github.com/lab-smile/BrainSegFounder) --- a 3D foundation model pretrained on 41,400 UK Biobank brain MRIs --- produced the largest single improvement to date. BrainSegFounder uses the same SwinUNETR-Tiny architecture, making it a direct drop-in weight replacement.
+
+| Metric | MONAI Baseline | BrainSegFounder | Improvement |
+|--------|---------------|-----------------|-------------|
+| Mean Dice | 0.8325 | **0.8453** | **+1.54%** |
+| TC Dice | 0.8189 | 0.8320 | +1.60% |
+| WT Dice | 0.8802 | 0.8909 | +1.21% |
+| ET Dice | 0.7985 | 0.8129 | **+1.80%** |
+| Mean HD95 (mm) | 12.39 | **6.48** | **-47.7%** |
+
+**Why it works**: BrainSegFounder's two-stage self-supervised pretraining (anatomical structure learning → disease-specific attribute learning) produces encoder features specifically tuned for brain MRI analysis. This is a much stronger initialization than MONAI's general-purpose SSL, particularly for the small, irregular enhancing tumor (ET) class where learned features matter most.
+
+**Training details**: SwinUNETR-Tiny (feature_size=48), 128³ roi_size, AdamW (lr=1e-4), warmup cosine schedule (50 epoch warmup), DiceCE loss, AMP, batch_size=1, early stopped at epoch 264 (best at epoch 214). ~15 hours on RTX 5070 Ti 16GB. See [docs/results.md](docs/results.md) for the full validation trajectory and detailed analysis.
+
+### Self-Training Results
+
+Self-training achieved **marginal Dice improvement but 24% sharper boundaries** (HD95), with the hardest class (Enhancing Tumor) benefiting most. These results use the MONAI baseline at 96³ roi_size (required for dual teacher-student models on 16GB VRAM).
+
+| Metric | Baseline (96³) | Best Self-Trained | Improvement |
 |--------|----------|-------------------|-------------|
 | Mean Dice | 0.8325 | 0.8346 (Round 1) | +0.25% |
 | TC Dice | 0.8189 | 0.8205 (Round 1) | +0.19% |
@@ -62,12 +80,13 @@ WT:  14.7 → 10.8 mm  (-26.2%)    ███████████████
 ET:   9.5 →  7.0 mm  (-26.7%)    ██████████████████████░░  Round 1
 ```
 
-**Key findings:**
-- **Boundary refinement is the primary benefit.** Dice (volume overlap) barely moved, but HD95 (worst-case boundary error) improved dramatically — clinically meaningful for radiotherapy planning where 3mm matters.
-- **ET class improved most** (+1.05% Dice, -26.7% HD95). The per-class threshold offsets (+0.05 for ET) successfully protected this hard class from noisy pseudo-labels.
-- **Diminishing Dice returns after Round 1**, but HD95 continued improving through Round 3.
-- **80-82% of unlabeled volumes accepted** as pseudo-labels. The remaining 18% were correctly identified as too ambiguous across all rounds.
-- **Cost**: ~40-60 GPU-hours across 4 rounds (2-3x baseline training cost).
+### Key Findings
+
+- **Domain-specific pretraining > semi-supervised learning** at this dataset scale (484 labeled volumes). BrainSegFounder achieved 6x more Dice improvement (+1.54% vs +0.25%) and 2x better HD95 improvement (-47.7% vs -24.0%) than self-training, with zero additional data engineering.
+- **ET class consistently benefits most** from both approaches (+1.80% from BrainSegFounder, +1.05% from self-training). Methods that improve feature quality disproportionately help the hardest class.
+- **Boundary refinement is self-training's primary value.** Dice barely moved, but HD95 improved dramatically — clinically meaningful for radiotherapy planning.
+- **80-82% of unlabeled volumes accepted** as pseudo-labels. The remaining 18% were correctly identified as too ambiguous.
+- **Next step**: Self-training from the BrainSegFounder baseline to combine both approaches.
 
 ![HD95 Boundary Improvement](figures/hd95_boundary_improvement.png)
 ![Dice Progression](figures/dice_progression.png)
@@ -106,11 +125,16 @@ pip install -e .
 
 ### Data Setup
 
-Download the MSD Task01 Brain Tumour dataset and pretrained SwinViT weights using the base package scripts:
+Download the MSD Task01 Brain Tumour dataset and pretrained weights using the base package scripts:
 ```bash
 cd /path/to/vit_swinunetr_segmentation
 python scripts/download_data.py --output-dir data
+
+# Option A: MONAI pretrained weights (general-purpose SSL)
 python scripts/download_weights.py --output-dir pretrained
+
+# Option B: BrainSegFounder weights (brain-specific SSL, recommended)
+python scripts/download_brainsegfounder.py --output-dir pretrained/brainsegfounder
 ```
 
 ### Run Self-Training
@@ -217,14 +241,15 @@ training:
 
 See [docs/method.md](docs/method.md) for detailed explanation of each parameter.
 
-## Per-Round Results
+## Per-Round Self-Training Results
 
 | Round | Threshold Range | Accepted | Mean Dice | HD95 (mm) | Early Stop |
 |-------|----------------|----------|-----------|-----------|------------|
-| Baseline (96³) | N/A | N/A | 0.8325 | 12.39 | Epoch 119/300 |
+| MONAI Baseline (96³) | N/A | N/A | 0.8325 | 12.39 | Epoch 119/300 |
 | Round 1 | 0.95→0.91 / 0.90→0.86 / 1.00→0.96 | 212/266 (80%) | **0.8346** | 10.02 | Epoch 39/100 |
 | Round 2 | 0.91→0.82 / 0.86→0.77 / 0.96→0.87 | 219/266 (82%) | 0.8320 | 11.33 | Epoch 44/100 |
 | Round 3 | 0.82→0.75 / 0.77→0.70 / 0.87→0.80 | 219/266 (82%) | 0.8328 | **9.41** | Epoch 79/100 |
+| **BSF Baseline (128³)** | **N/A** | **N/A** | **0.8453** | **6.48** | **Epoch 214/300** |
 
 ## Documentation
 
@@ -281,6 +306,15 @@ If you use this code or find it useful, please cite:
   journal={Advances in Neural Information Processing Systems},
   year={2020}
 }
+
+@article{ren2024brainsegfounder,
+  title={BrainSegFounder: Towards 3D Foundation Models for Neuroimage
+         Segmentation},
+  author={Ren, Jingyi and others},
+  journal={Medical Image Analysis},
+  year={2024},
+  note={arXiv:2406.10395}
+}
 ```
 
 ## Acknowledgments
@@ -288,6 +322,7 @@ If you use this code or find it useful, please cite:
 - [MONAI](https://monai.io/) --- Medical Open Network for Artificial Intelligence framework
 - [Medical Segmentation Decathlon](https://medicaldecathlon.com/) --- Brain Tumour dataset
 - [NVIDIA Research](https://github.com/Project-MONAI/research-contributions/tree/main/SwinUNETR) --- SwinUNETR reference implementation and pretrained weights
+- [BrainSegFounder](https://github.com/lab-smile/BrainSegFounder) --- 3D foundation model for brain MRI segmentation (Ren et al., 2024)
 - [vit_swinunetr_segmentation](https://github.com/rgbussell/vit_swinunetr_segmentation) --- Base segmentation package this project extends
 
 ## License
