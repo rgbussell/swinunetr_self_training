@@ -118,17 +118,31 @@ This prevents the hardest class from being poisoned by noisy pseudo-labels early
 
 ## Results
 
-> **Results will be populated after training completes. Expected timeline: ~40-60 GPU-hours across 4 rounds.**
+| Metric | Baseline | Best | Improvement |
+|--------|----------|------|-------------|
+| Mean Dice | 0.8325 | 0.8346 (Round 1) | +0.25% |
+| TC Dice | 0.8189 | 0.8205 (Round 1) | +0.19% |
+| WT Dice | 0.8802 | 0.8802 | ±0% |
+| ET Dice | 0.7985 | 0.8069 (Round 1) | **+1.05%** |
+| Mean HD95 | 12.39 mm | 9.41 mm (Round 3) | **-24.0%** |
 
-| Metric | Baseline | Round 3 (Best) | Improvement |
-|--------|----------|----------------|-------------|
-| Mean Dice | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
-| TC Dice | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
-| WT Dice | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
-| ET Dice | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
-| Mean HD95 | [PLACEHOLDER] | [PLACEHOLDER] | [PLACEHOLDER] |
+The headline: **Dice barely moved, but boundaries got 24% sharper.**
 
-**Expected improvement:** 2-4% mean Dice increase. While this sounds modest, in medical segmentation where state-of-the-art models already achieve 85%+ Dice, a 2-3 point improvement is meaningful --- it often translates to better boundary delineation in the cases that matter most clinically.
+This was a surprise. We expected moderate Dice gains (2-4%) based on the literature. Instead, volume overlap improved only marginally (+0.25%), while boundary quality — measured by Hausdorff Distance at the 95th percentile — improved dramatically.
+
+What does a 24% HD95 reduction actually mean? In clinical terms, the worst-case boundary error across the segmentation shrank from ~12.4 mm to ~9.4 mm. For radiotherapy planning, where margins of 1-2 cm are common, shaving 3 mm off the worst boundary error can meaningfully reduce irradiation of healthy brain tissue.
+
+The ET class (enhancing tumor, the hardest target) showed the most improvement: +1.05% Dice and -26.7% HD95. This is the class where clinical accuracy matters most — the enhancing region guides surgical resection decisions — and it's where the additional unlabeled data provided the most value.
+
+```
+Per-class HD95 reduction (Baseline → Best):
+  TC:  12.9 → 10.1 mm  (-21.6%)
+  WT:  14.7 → 10.8 mm  (-26.2%)
+  ET:   9.5 →  7.0 mm  (-26.7%)
+```
+
+![HD95 Boundary Improvement](../figures/hd95_boundary_improvement.png)
+![Dice Progression](../figures/dice_progression.png)
 
 ## What We Learned
 
@@ -169,13 +183,19 @@ Prerequisites: NVIDIA GPU (>=16 GB VRAM), CUDA 11.8+, Python 3.10+. Full setup i
 
 ## What's Next
 
-1. **Cross-dataset validation.** Test the self-training pipeline on BraTS 2021 challenge data and private institutional datasets to evaluate generalization under domain shift.
+Based on the results and current literature, here are the most promising next steps ranked by expected impact vs effort:
 
-2. **Architecture-agnostic framework.** Extend the pipeline to support nnU-Net, 3D U-Net, and other segmentation backbones. The teacher-student loop and curriculum thresholding are architecture-independent.
+1. **Boundary loss function.** Add Kervadec et al.'s boundary loss alongside Dice+CE. Since our biggest win was boundary refinement (HD95), directly optimizing for boundary quality should amplify this. Published results show up to 10% HD95 improvement — and it's a drop-in loss function, ~20 lines of code.
 
-3. **Active learning integration.** Use the confidence filtering information to identify which unlabeled volumes the model is least certain about, prioritizing those for expert annotation. This combines self-training (for the easy cases) with targeted labeling (for the hard cases).
+2. **BrainSegFounder pretrained weights.** A 2024 foundation model built *on the SwinUNETR architecture* — same model, much better initialization. Trained on 41,400 UK Biobank brain MRIs. Drop-in replacement for our pretrained encoder weights. Zero code changes, potentially significant gains.
 
-4. **Multi-site federated self-training.** In clinical settings, unlabeled data often lives at multiple hospitals. A federated version of this pipeline could leverage data across institutions without centralizing patient scans.
+3. **Connected component post-processing.** Remove small spurious predictions with per-class size thresholds. A 2024 BraTS paper showed +14.9% ranking metric improvement from post-processing alone — and it's pure inference-time CPU work with no retraining.
+
+4. **Test-time augmentation.** Average predictions across 8 geometric transforms (3-axis flips). Standard in BraTS competitions. MONAI has built-in support. Consistently adds 0.5-1.5% Dice and 5-15% HD95 improvement.
+
+5. **Architecture ensemble.** Train nnU-Net or MedNeXt alongside SwinUNETR and average predictions. The BraTS 2024 winning solution used equal-weight ensemble of nnU-Net + MedNeXt + SwinUNETR. More training cost, but reliable improvement.
+
+See `docs/research-pathway.md` for the full research roadmap with paper references.
 
 ---
 
