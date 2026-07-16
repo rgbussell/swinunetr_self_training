@@ -1,0 +1,8 @@
+[cache]
+    type = "hardlink,symlink,copy"
+[core]
+    autostage = true
+    remote = gdrive
+['remote "gdrive"']
+    url = gdrive://17MzqMXlAuMaHMU_JAHa8PsPye7QivJlx
+    gdrive_acknowledge_abuse = true
