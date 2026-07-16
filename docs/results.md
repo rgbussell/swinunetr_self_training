@@ -75,6 +75,41 @@ Fully-supervised SwinUNETR initialized with BrainSegFounder pretrained encoder w
 - **Convergence trajectory** shows the model surpassed the MONAI baseline by epoch 84 (28% through training). However, gains above 0.840 were slow and incremental (epochs 84-214), suggesting the model is approaching the ceiling for this architecture+data combination with DiceCE loss alone.
 - **Comparison to self-training gains**: BrainSegFounder achieved +1.54% Mean Dice improvement with zero additional data engineering effort — 6x more than the self-training Dice gain (+0.25%) and with 2x better HD95 improvement (-47.7% vs -24.0%). This confirms that encoder initialization quality has a larger impact than semi-supervised learning for this dataset size (484 labeled volumes).
 
+### 1.3 MedicalNet ResNet-UNet Baseline (128³ roi_size)
+
+ResNet50-UNet initialized with MedicalNet pretrained encoder weights (Chen et al., 2019 — supervised pretraining on 23 medical segmentation datasets including liver, lung, heart, and brain). Trained on 387 labeled volumes for 300 max epochs. Uses 128³ roi_size. Config: `configs/medicalnet_config.yaml` in `vit_swinunetr_segmentation`.
+
+| Metric | TC | WT | ET | Mean |
+|--------|------|------|------|------|
+| Dice | — | — | — | — |
+| HD95 (mm) | — | — | — | — |
+
+**Comparison vs other baselines:**
+
+| Metric | MONAI Baseline | BrainSegFounder | MedicalNet |
+|--------|---------------|-----------------|------------|
+| Architecture | SwinUNETR | SwinUNETR | ResNet50-UNet |
+| Encoder pretraining | ImageNet SSL | 41K brain MRI SSL | 23 medical datasets (supervised) |
+| roi_size | 96³ | 128³ | 128³ |
+| Mean Dice | 0.8325 | 0.8453 | — |
+| Mean HD95 | 12.39 mm | 6.48 mm | — |
+
+**Training procedure:**
+- **Pretrained weights**: MedicalNet ResNet-50 (auto-downloaded from HuggingFace via MONAI)
+- **Config**: `configs/medicalnet_config.yaml` in `vit_swinunetr_segmentation`
+- **roi_size**: 128³
+- **Optimizer**: AdamW, lr=1e-4, weight_decay=1e-5
+- **LR schedule**: Warmup cosine (50 epoch warmup to peak LR, cosine decay to 0)
+- **Loss**: DiceCE (same as other baselines)
+- **AMP**: Enabled (mixed precision training)
+- **Batch size**: 1 (with gradient accumulation=1)
+- **Early stopping**: Patience 50
+- **Hardware**: NVIDIA RTX 5070 Ti (16GB VRAM)
+
+**Training status**: In progress. Results to be filled after evaluation.
+
+**Key question**: Does a CNN backbone (ResNet50) with diverse medical pretraining (23 datasets) compete with a transformer backbone (SwinViT) pretrained on domain-specific brain MRI data? This comparison disentangles architecture effects (CNN vs transformer) from pretraining strategy effects (breadth vs depth).
+
 ## 2. Per-Round Self-Training Results
 
 ### 2.1 Summary Table

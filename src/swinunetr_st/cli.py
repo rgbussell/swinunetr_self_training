@@ -74,7 +74,7 @@ def generate_pseudo_labels() -> None:
     _setup_logging(args.verbose)
 
     import torch
-    from swinunetr_seg.models.swinunetr import create_swinunetr
+    from swinunetr_seg.models.factory import create_model
 
     from swinunetr_st.training.curriculum import ThresholdScheduler
     from swinunetr_st.training.pseudo_labeler import PseudoLabeler
@@ -84,7 +84,7 @@ def generate_pseudo_labels() -> None:
     validate_config(config)
 
     # Load model
-    model = create_swinunetr(config)
+    model = create_model(config)
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])

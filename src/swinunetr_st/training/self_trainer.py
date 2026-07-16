@@ -11,7 +11,7 @@ import torch
 from monai.data import CacheDataset
 from monai.inferers import sliding_window_inference
 from monai.transforms import Activations, AsDiscrete, Compose
-from swinunetr_seg.models.swinunetr import create_swinunetr
+from swinunetr_seg.models.factory import create_model
 from swinunetr_seg.utils.metrics import MetricsTracker
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -52,7 +52,7 @@ class SelfTrainer:
         logger.info("SelfTrainer using device: %s", self.device)
 
         # Create student model and load baseline checkpoint
-        self.student = create_swinunetr(config).to(self.device)
+        self.student = create_model(config).to(self.device)
         self._load_baseline_checkpoint(config["paths"]["baseline_checkpoint"])
 
         # Create EMA teacher from student

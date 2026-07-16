@@ -51,6 +51,7 @@ def trainer_config(tmp_path: Path, baseline_checkpoint: str) -> dict:
     """Full configuration dictionary for SelfTrainer tests."""
     return {
         "model": {
+            "type": "swinunetr",
             "feature_size": 12,
             "img_size": [64, 64, 64],
             "in_channels": 4,
@@ -99,9 +100,9 @@ def trainer_config(tmp_path: Path, baseline_checkpoint: str) -> dict:
 
 
 @pytest.fixture
-def mock_create_swinunetr():
-    """Patch create_swinunetr to return a DummyModel."""
-    with patch("swinunetr_st.training.self_trainer.create_swinunetr") as mock_fn:
+def mock_create_model():
+    """Patch create_model to return a DummyModel."""
+    with patch("swinunetr_st.training.self_trainer.create_model") as mock_fn:
         mock_fn.side_effect = lambda config: DummyModel(
             in_channels=config["model"]["in_channels"],
             out_channels=config["model"]["out_channels"],
@@ -110,7 +111,7 @@ def mock_create_swinunetr():
 
 
 @pytest.fixture
-def trainer(trainer_config: dict, mock_create_swinunetr) -> SelfTrainer:
+def trainer(trainer_config: dict, mock_create_model) -> SelfTrainer:
     """Create a SelfTrainer instance with mocked model creation."""
     return SelfTrainer(trainer_config, device=torch.device("cpu"))
 
@@ -158,7 +159,7 @@ class TestSelfTrainerInit:
         assert trainer.current_round == 0
         assert trainer.best_dice == 0.0
 
-    def test_init_device_auto_detect(self, trainer_config: dict, mock_create_swinunetr) -> None:
+    def test_init_device_auto_detect(self, trainer_config: dict, mock_create_model) -> None:
         """When device is None, should auto-detect."""
         t = SelfTrainer(trainer_config, device=None)
         expected_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -170,7 +171,7 @@ class TestSelfTrainerInit:
         assert trainer.scaler is None
 
     def test_init_loads_baseline_checkpoint_model_state_dict(
-        self, trainer_config: dict, mock_create_swinunetr
+        self, trainer_config: dict, mock_create_model
     ) -> None:
         """Should load checkpoint with model_state_dict key."""
         trainer = SelfTrainer(trainer_config, device=torch.device("cpu"))
@@ -178,7 +179,7 @@ class TestSelfTrainerInit:
         assert trainer.student is not None
 
     def test_init_loads_baseline_checkpoint_direct(
-        self, trainer_config: dict, baseline_checkpoint_direct: str, mock_create_swinunetr
+        self, trainer_config: dict, baseline_checkpoint_direct: str, mock_create_model
     ) -> None:
         """Should load checkpoint with direct state dict (no wrapper key)."""
         trainer_config["paths"]["baseline_checkpoint"] = baseline_checkpoint_direct

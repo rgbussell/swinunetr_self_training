@@ -1,12 +1,7 @@
 model:
-  type: swinunetr
-  feature_size: 48
-  img_size: [128, 128, 128]
+  type: resenc_unet
   in_channels: 4
   out_channels: 3
-  use_checkpoint: true
-  drop_rate: 0.0
-  attn_drop_rate: 0.0
 
 self_training:
   num_rounds: 4
@@ -41,7 +36,7 @@ training:
   weight_decay: 1.0e-5
   warmup_epochs: 10
   batch_size: 1
-  num_workers: 4
+  num_workers: 2
   amp: true
   gradient_accumulation_steps: 1
   early_stopping_patience: 30
@@ -58,9 +53,11 @@ data:
     gaussian_smooth_sigma: [0.5, 1.15]
 
 paths:
-  base_data_dir: /home/rbussell/projects/vit_swinunetr_segmentation/data/Task01_BrainTumour
-  baseline_checkpoint: /home/rbussell/projects/vit_swinunetr_segmentation/checkpoints/best_model.pt
-  output_dir: /home/rbussell/projects/swinunetr_self_training/outputs
-  checkpoint_dir: /home/rbussell/projects/swinunetr_self_training/checkpoints
-  pseudo_label_dir: /home/rbussell/projects/swinunetr_self_training/pseudo_labels
-  results_dir: /home/rbussell/projects/swinunetr_self_training/results
+  # Paths are relative to the project root. The sibling repo
+  # vit_swinunetr_segmentation supplies the base data + baseline checkpoint.
+  base_data_dir: ../vit_swinunetr_segmentation/data/Task01_BrainTumour
+  baseline_checkpoint: ../vit_swinunetr_segmentation/checkpoints/openmind/best_model.pt
+  output_dir: outputs/openmind
+  checkpoint_dir: checkpoints/openmind
+  pseudo_label_dir: pseudo_labels/openmind
+  results_dir: results/openmind
