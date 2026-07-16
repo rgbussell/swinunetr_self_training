@@ -1,0 +1,6 @@
+outs:
+- md5: ffe74f15fc7dea1ed88b2ea8e0fb9a91.dir
+  size: 65995492865
+  nfiles: 1101
+  hash: md5
+  path: pseudo_labels
